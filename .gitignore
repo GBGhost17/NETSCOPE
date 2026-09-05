@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database (không đẩy dữ liệu quét mạng nhà bạn lên mạng)
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
