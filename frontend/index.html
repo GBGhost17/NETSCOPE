@@ -1,26 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NetScope - Network Scanner</title>
+    <title>NetScope — Network Scanner & Monitor</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
     <div class="container">
+        <!-- Header -->
         <header>
-            <h1>NetScope</h1>
-            <p>Network Security Scanner</p>
+            <div class="logo">
+                <span class="pulse-icon">●</span> NetScope
+            </div>
+            <p class="subtitle">Hệ thống Quét & Giám sát Mạng Nội bộ Thời gian thực</p>
         </header>
 
-        <main>
-            <div id="app"></div>
-        </main>
+        <!-- Scan Control Card -->
+        <section class="card control-panel">
+            <div class="input-group">
+                <label for="target-input">Dải mạng mục tiêu (CIDR):</label>
+                <div class="form-row">
+                    <input type="text" id="target-input" value="192.168.1.1/24" placeholder="VD: 192.168.1.1/24">
+                    <button id="scan-btn" onclick="startScan()">Khởi động Quét</button>
+                </div>
+            </div>
+
+            <!-- Progress Bar (Ẩn mặc định, hiện khi quét) -->
+            <div id="progress-container" class="hidden">
+                <div class="progress-info">
+                    <span id="progress-step">Đang khởi tạo...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progress-bar-fill"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Monitoring / Diff Alert Box -->
+        <section id="diff-section" class="card diff-card hidden">
+            <h3>⚡ Biến động Mạng Gần nhất</h3>
+            <div id="diff-content"></div>
+        </section>
+
+        <!-- Main Content: Active Scan Results -->
+        <section class="card results-card">
+            <div class="section-header">
+                <h2>Kết quả Phiên Quét Hiện tại</h2>
+                <span id="scan-meta" class="badge-neutral">Chưa có dữ liệu</span>
+            </div>
+            <div id="hosts-grid" class="hosts-grid">
+                <!-- Các thẻ Host sẽ được JS sinh động vào đây -->
+            </div>
+        </section>
+
+        <!-- Scan History Table -->
+        <section class="card history-card">
+            <h2>Lịch sử các Phiên Quét</h2>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Mục tiêu</th>
+                            <th>Thời gian thực thi</th>
+                            <th>Số Host Online</th>
+                            <th>Thời điểm quét</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <!-- Dữ liệu lịch sử -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script src="app.js"></script>
 </body>
-
 </html>
