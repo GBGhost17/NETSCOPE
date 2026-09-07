@@ -54,7 +54,7 @@ function startPolling() {
             if (!data.is_running && data.progress === 100) {
                 clearInterval(pollingTimer);
                 document.getElementById("scan-btn").disabled = false;
-                
+
                 // Tải chi tiết phiên vừa quét xong
                 if (data.last_scan_id) {
                     loadScanDetail(data.last_scan_id);
@@ -74,7 +74,7 @@ async function loadScanDetail(scanId) {
         const res = await fetch(`${API_BASE}/scans/${scanId}`);
         const data = await res.json();
 
-        document.getElementById("scan-meta").innerText = 
+        document.getElementById("scan-meta").innerText =
             `Scan #${data.id} (${data.target}) — Hoàn thành trong ${data.scan_time}s lúc ${data.created_at}`;
 
         const grid = document.getElementById("hosts-grid");
@@ -87,23 +87,31 @@ async function loadScanDetail(scanId) {
         }
 
         hosts.forEach(ip => {
-            const ports = data.hosts[ip];
+            const hostInfo = data.hosts[ip];
+            const ports = hostInfo.ports || [];
+            const mac = hostInfo.mac || "Unknown";
+            const vendor = hostInfo.vendor || "Unknown Device";
+
             const card = document.createElement("div");
             card.className = "host-card";
 
             let portsHtml = "";
             if (ports.length === 0) {
-                portsHtml = "<p style='font-size: 12px; color: var(--text-secondary);'>Không có port mở</p>";
+                portsHtml = "<p style='font-size: 12px; color: var(--text-secondary); margin-top: 6px;'>Không có port mở (1-1000)</p>";
             } else {
-                portsHtml = ports.map(p => 
+                portsHtml = ports.map(p =>
                     `<span class="port-pill">Port ${p.port} (${p.service})</span>`
                 ).join("");
             }
 
             card.innerHTML = `
-                <div class="host-ip">🖥️ ${ip}</div>
-                <div>${portsHtml}</div>
-            `;
+            <div class="host-ip">🖥️ ${ip}</div>
+            <div class="host-meta">
+                <div><strong>MAC:</strong> <code>${mac}</code></div>
+                <div><span class="vendor-badge">${vendor}</span></div>
+            </div>
+            <div style="margin-top: 10px;">${portsHtml}</div>
+        `;
             grid.appendChild(card);
         });
     } catch (e) {

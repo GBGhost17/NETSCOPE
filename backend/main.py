@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from database.db import init_db, save_scan, get_scan_by_id, get_all_scans, get_latest_two_scans
 from scanner.host_discovery import discover_hosts
 from scanner.port_scanner import scan_host_ports
+from scanner.mac_resolver import get_system_arp_table, resolve_vendor
 from scanner.monitor import diff_scans
 
 app = FastAPI(
@@ -50,39 +51,51 @@ def background_scan_pipeline(target_network: str):
     global SCAN_STATE
     try:
         start_time = time.time()
-        
-        # 1. Phát hiện Host
+
+        # Bước 1: Quét tìm host
         SCAN_STATE["step"] = f"Đang dò tìm thiết bị trong dải {target_network}..."
         SCAN_STATE["progress"] = 20
         alive_hosts = discover_hosts(target_network)
-        
-        # 2. Quét cổng các host online
+
+        # Đọc bảng ARP cache ngay sau khi vừa ping xong
+        arp_table = get_system_arp_table()
+
+        # Bước 2: Quét cổng
         SCAN_STATE["step"] = f"Phát hiện {len(alive_hosts)} máy Online. Bắt đầu quét cổng..."
         SCAN_STATE["progress"] = 50
-        
+
         ports_to_scan = range(1, 1001)
         hosts_data = {}
-        
+
         for idx, ip in enumerate(alive_hosts, 1):
             SCAN_STATE["step"] = f"Đang quét port máy {ip} ({idx}/{len(alive_hosts)})..."
-            hosts_data[ip] = scan_host_ports(ip, ports_to_scan)
-            
-        # 3. Ghi dữ liệu vào SQLite
-        SCAN_STATE["step"] = "Đang lưu kết quả vào Database..."
+            open_ports = scan_host_ports(ip, ports_to_scan)
+
+            mac = arp_table.get(ip, "Unknown")
+            vendor = resolve_vendor(mac) if mac != "Unknown" else "This Machine / Gateway"
+
+            hosts_data[ip] = {
+                "mac": mac,
+                "vendor": vendor,
+                "ports": open_ports
+            }
+
+        # Bước 3: Lưu Database
+        SCAN_STATE["step"] = "Đang tổng hợp và lưu kết quả vào Database..."
         SCAN_STATE["progress"] = 90
-        
+
         scan_report = {
             "target_network": target_network,
             "scan_time": round(time.time() - start_time, 2),
             "hosts": hosts_data
         }
-        
+
         scan_id = save_scan(scan_report)
-        
+
         SCAN_STATE["step"] = "Hoàn tất!"
         SCAN_STATE["progress"] = 100
         SCAN_STATE["last_scan_id"] = scan_id
-        
+
     except Exception as e:
         SCAN_STATE["error"] = str(e)
         SCAN_STATE["step"] = f"Lỗi: {str(e)}"
