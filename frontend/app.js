@@ -196,7 +196,10 @@ async function loadDiff() {
 }
 
 // 6. Tải và hiển thị báo cáo đánh giá rủi ro an ninh mạng
+let securityAuditRequestSeq = 0;
+
 async function loadSecurityAudit(scanId) {
+    const requestSeq = ++securityAuditRequestSeq;
     const card = document.getElementById("security-card");
     const badge = document.getElementById("security-badge");
     const summary = document.getElementById("security-summary");
@@ -206,12 +209,14 @@ async function loadSecurityAudit(scanId) {
 
     try {
         const res = await fetch(`${API_BASE}/scans/${scanId}/security`);
+        if (requestSeq !== securityAuditRequestSeq) return;
         if (!res.ok) {
             card.classList.add("hidden");
             return;
         }
 
         const data = await res.json();
+        if (requestSeq !== securityAuditRequestSeq) return;
         const audit = data.audit;
 
         card.classList.remove("hidden");
