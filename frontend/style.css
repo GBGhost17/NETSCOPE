@@ -242,3 +242,19 @@ th {
     font-weight: 500;
     margin-top: 4px;
 }
+
+/* banner */
+.port-item {
+    margin-bottom: 6px;
+}
+.banner-text {
+    display: block;
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(15, 23, 42, 0.6);
+    border-left: 2px solid var(--accent);
+    padding: 2px 6px;
+    margin-top: 2px;
+    word-break: break-all;
+}

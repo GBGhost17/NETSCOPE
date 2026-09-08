@@ -99,9 +99,15 @@ async function loadScanDetail(scanId) {
             if (ports.length === 0) {
                 portsHtml = "<p style='font-size: 12px; color: var(--text-secondary); margin-top: 6px;'>Không có port mở (1-1000)</p>";
             } else {
-                portsHtml = ports.map(p =>
-                    `<span class="port-pill">Port ${p.port} (${p.service})</span>`
-                ).join("");
+                portsHtml = ports.map(p => {
+                    const bannerHtml = p.banner ? `<span class="banner-text">↳ ${p.banner}</span>` : "";
+                    return `
+                        <div class="port-item">
+                            <span class="port-pill">Port ${p.port} (${p.service})</span>
+                            ${bannerHtml}
+                        </div>
+                    `;
+                }).join("");
             }
 
             card.innerHTML = `
