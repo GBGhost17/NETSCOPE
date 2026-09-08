@@ -53,10 +53,15 @@ def init_db():
         if "vendor" not in columns:
             cursor.execute("ALTER TABLE hosts ADD COLUMN vendor TEXT DEFAULT 'Unknown Device'")
 
+        cursor.execute("PRAGMA table_info(ports)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "banner" not in columns:
+            cursor.execute("ALTER TABLE ports ADD COLUMN banner TEXT DEFAULT ''")
+
         conn.commit()
 
 def save_scan(scan_report: dict) -> int:
-    """Lưu toàn bộ kết quả phiên quét (bao gồm MAC và Vendor)."""
+    """Lưu toàn bộ kết quả phiên quét (đảm bảo mỗi port chỉ insert đúng 1 lần)."""
     with get_connection() as conn:
         cursor = conn.cursor()
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -77,11 +82,14 @@ def save_scan(scan_report: dict) -> int:
             )
             host_id = cursor.lastrowid
             
+            # CHỈ DÙNG 1 LỆNH INSERT DUY NHẤT CHO MỖI PORT
             for p in host_info.get("ports", []):
+                banner = p.get("banner", "")
                 cursor.execute(
-                    "INSERT INTO ports (host_id, port, service) VALUES (?, ?, ?)",
-                    (host_id, p["port"], p["service"])
+                    "INSERT INTO ports (host_id, port, service, banner) VALUES (?, ?, ?, ?)",
+                    (host_id, p["port"], p["service"], banner)
                 )
+                
         conn.commit()
         return scan_id
 
@@ -108,13 +116,13 @@ def get_scan_by_id(scan_id: int):
         for host in hosts:
             h_id = host["id"]
             ip = host["ip"]
-            cursor.execute("SELECT port, service FROM ports WHERE host_id = ?", (h_id,))
+            cursor.execute("SELECT port, service, banner FROM ports WHERE host_id = ?", (h_id,))
             ports = cursor.fetchall()
-            
+
             result["hosts"][ip] = {
                 "mac": host["mac"],
                 "vendor": host["vendor"],
-                "ports": [{"port": p["port"], "service": p["service"]} for p in ports]
+                "ports": [{"port": p["port"], "service": p["service"], "banner": p["banner"] or ""} for p in ports]
             }
             
         return result
