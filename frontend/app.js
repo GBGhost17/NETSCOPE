@@ -120,6 +120,10 @@ async function loadScanDetail(scanId) {
         `;
             grid.appendChild(card);
         });
+
+        // Gọi nạp dữ liệu đánh giá an ninh mạng cho phiên này
+        loadSecurityAudit(scanId);
+        
     } catch (e) {
         console.error("Lỗi lấy chi tiết scan:", e);
     }
@@ -190,3 +194,55 @@ async function loadDiff() {
         console.error("Lỗi nạp Diff:", e);
     }
 }
+
+// 6. Tải và hiển thị báo cáo đánh giá rủi ro an ninh mạng
+let securityAuditRequestSeq = 0;
+
+async function loadSecurityAudit(scanId) {
+    const requestSeq = ++securityAuditRequestSeq;
+    const card = document.getElementById("security-card");
+    const badge = document.getElementById("security-badge");
+    const summary = document.getElementById("security-summary");
+    const list = document.getElementById("security-findings-list");
+
+    if (!card) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/scans/${scanId}/security`);
+        if (requestSeq !== securityAuditRequestSeq) return;
+        if (!res.ok) {
+            card.classList.add("hidden");
+            return;
+        }
+
+        const data = await res.json();
+        if (requestSeq !== securityAuditRequestSeq) return;
+        const audit = data.audit;
+
+        card.classList.remove("hidden");
+        badge.className = `grade-${audit.grade}`;
+        badge.innerText = `${audit.score}/100 (Hạng ${audit.grade})`;
+        summary.innerText = `Trạng thái: ${audit.status} — Phát hiện ${audit.total_issues} rủi ro an ninh.`;
+
+        if (audit.findings.length === 0) {
+            list.innerHTML = "<p style='color: var(--success); font-size: 13px;'>Không phát hiện cổng dịch vụ có nguy cơ rủi ro cao.</p>";
+            return;
+        }
+
+        list.innerHTML = audit.findings.map(f => `
+            <div class="finding-item sev-${f.severity}">
+                <div class="finding-title">
+                    <span>[${f.severity}] <code>${f.ip}:${f.port}</code> — ${f.service}</span>
+                    <span style="color: var(--danger); font-weight: bold;">-${f.penalty} điểm</span>
+                </div>
+                <div class="finding-desc">${f.description}</div>
+                <div class="finding-remediation"><strong>Khắc phục:</strong> ${f.remediation}</div>
+            </div>
+        `).join("");
+
+    } catch (e) {
+        console.error("Lỗi khi tải dữ liệu Security Audit:", e);
+        card.classList.add("hidden");
+    }
+}
+

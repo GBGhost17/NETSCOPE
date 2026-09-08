@@ -14,6 +14,7 @@ from scanner.host_discovery import discover_hosts
 from scanner.port_scanner import scan_host_ports
 from scanner.mac_resolver import get_system_arp_table, resolve_vendor
 from scanner.monitor import diff_scans
+from scanner.security_scorer import evaluate_network_security
 
 app = FastAPI(
     title="NetScope API",
@@ -149,6 +150,20 @@ def compare_latest_scans():
         "old_scan": {"id": old_data["id"], "time": old_data["created_at"]},
         "new_scan": {"id": new_data["id"], "time": new_data["created_at"]},
         "changes": diff_result
+    }
+
+@app.get("/api/scans/{scan_id}/security", summary="Đánh giá rủi ro và chấm điểm an ninh mạng cho phiên quét")
+def get_security_audit(scan_id: int):
+    scan_data = get_scan_by_id(scan_id)
+    if not scan_data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phiên quét.")
+    
+    audit_report = evaluate_network_security(scan_data["hosts"])
+    return {
+        "scan_id": scan_id,
+        "target": scan_data["target"],
+        "created_at": scan_data["created_at"],
+        "audit": audit_report
     }
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
