@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NetScope — Network Scanner & Monitor</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -44,6 +46,18 @@
             <div id="diff-content"></div>
         </section>
 
+        <!-- Bảng Chấm điểm An ninh Mạng -->
+        <section id="security-card" class="card hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2>🛡️ Đánh giá An ninh Mạng</h2>
+                <div id="security-badge"
+                    style="font-size: 20px; font-weight: 700; padding: 4px 12px; border-radius: 6px;">--</div>
+            </div>
+            <div id="security-summary" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            </div>
+            <div id="security-findings-list"></div>
+        </section>
+
         <!-- Main Content: Active Scan Results -->
         <section class="card results-card">
             <div class="section-header">
@@ -80,4 +94,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
