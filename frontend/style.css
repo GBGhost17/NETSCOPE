@@ -279,4 +279,18 @@ th {
     color: var(--accent);
     font-size: 12px;
     line-height: 1.4;
+/* banner */
+.port-item {
+    margin-bottom: 6px;
+}
+.banner-text {
+    display: block;
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(15, 23, 42, 0.6);
+    border-left: 2px solid var(--accent);
+    padding: 2px 6px;
+    margin-top: 2px;
+    word-break: break-all;
 }

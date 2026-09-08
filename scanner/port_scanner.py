@@ -1,6 +1,9 @@
 # scanner/port_scanner.py
 import socket
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from scanner.banner_grabber import grab_banner
 
 COMMON_SERVICES = {
     20: "FTP-DATA", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP",
@@ -25,17 +28,19 @@ def check_port(ip: str, port: int, timeout: float = 1.0) -> tuple[int, bool]:
         sock.close()
 
 def scan_host_ports(ip: str, ports: list[int] | range, max_threads: int = 100) -> list[dict]:
-    """Quét danh sách port trên IP và trả về danh sách service."""
+    """Quét đồng thời danh sách port trên một host và lấy banner dịch vụ."""
     open_ports = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = [executor.submit(check_port, ip, port) for port in ports]
-        for future in concurrent.futures.as_completed(futures):
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
+        future_to_port = {executor.submit(check_port, ip, port): port for port in ports}
+        for future in as_completed(future_to_port):
             port, is_open = future.result()
             if is_open:
+                service = get_service_name(port)
+                # Bóc tách banner dịch vụ thực tế
+                banner = grab_banner(ip, port)
                 open_ports.append({
                     "port": port,
-                    "service": get_service_name(port)
+                    "service": service,
+                    "banner": banner
                 })
-                
-    # Sắp xếp theo số hiệu port tăng dần
     return sorted(open_ports, key=lambda x: x["port"])
