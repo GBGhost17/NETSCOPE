@@ -1,67 +1,92 @@
-# NetScope — Network Scanner & Monitoring System
+# 🌐 NetScope — Network Reconnaissance & Security Audit Engine
 
-NetScope là hệ thống quét và giám sát mạng nội bộ (LAN) theo thời gian thực được xây dựng bằng **Python**, **FastAPI**, và **SQLite**. Hệ thống kết hợp lập trình mạng tầng socket, xử lý bất đồng bộ đa luồng (multi-threading) và thuật toán giám sát biến động (Diffing Engine) để theo dõi trạng thái thiết bị và cổng dịch vụ trên giao diện Web Dashboard.
+[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![Framework](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
+[![Database](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://www.sqlite.org/)
+[![Release](https://img.shields.io/badge/release-v1.1.0-emerald.svg)](https://github.com/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
----
-
-## ⚡ Tính năng nổi bật
-
-* **Khám phá mạng chuẩn xác (Host Discovery):** Quét toàn bộ dải mạng CIDR qua ICMP Ping. Bóc tách thông số `TTL` từ phản hồi để loại bỏ triệt để hiện tượng nhận diện sai (False Positive) do ARP Cache trên Windows.
-* **Quét cổng dịch vụ đồng thời (Multi-threaded Port Scanner):** Sử dụng TCP 3-Way Handshake kết hợp `ThreadPoolExecutor` để quét dải 1.000 port thông dụng trên nhiều host cùng lúc, rút ngắn thời gian thực thi xuống dưới 1 phút.
-* **Nhận diện dịch vụ (Service Detection):** Tự động ánh xạ số hiệu cổng sang tên dịch vụ tương ứng (DNS, HTTP, HTTPS, SMB, RPC, RDP, MySQL...).
-* **Công cụ giám sát biến động (Network Diffing Engine):** Áp dụng lý thuyết tập hợp (Set Operations) để so sánh trạng thái giữa các lần quét, cảnh báo thiết bị lạ gia nhập mạng, thiết bị offline hoặc thay đổi trạng thái cổng dịch vụ.
-* **Kiến trúc Asynchronous & Polling:** Đẩy tác vụ I/O mạng nặng vào `BackgroundTasks` của FastAPI; giao diện web cập nhật tiến trình liên tục qua cơ chế Polling mà không làm nghẽn server.
-* **Lưu trữ quan hệ phân cấp:** Lưu vết toàn bộ lịch sử quét vào SQLite theo cấu trúc quan hệ 1-N: `Scan -> Host -> Port`.
+**NetScope** là hệ thống trinh sát mạng cục bộ (LAN Reconnaissance), giám sát biến động thiết bị (Network Drift Detection) và đánh giá rủi ro an ninh mạng tự động. Ứng dụng kết hợp kiến trúc I/O bất đồng bộ hiệu năng cao (FastAPI, multi-threading) cùng Web Dashboard trực quan, hỗ trợ phân tích dữ liệu đa tầng từ Data Link (L2) đến Application (L7).
 
 ---
 
-## 🛠️ Công nghệ sử dụng
+## ⚡ Tính Năng Cốt Lõi
+
+### 1. Trinh Sát Mạng Đa Tầng (L2 - L7 Inspection)
+* **Khám phá Host chuẩn xác (L3):** Quét toàn bộ dải mạng CIDR qua ICMP Ping đa luồng. Bóc tách thông số `TTL` từ phản hồi để loại bỏ triệt để hiện tượng nhận diện sai (False Positive) do ARP Cache trên Windows.
+* **Định danh MAC & Nhà sản xuất (L2):** Phân tích bảng ARP Cache hệ thống (`arp -a`) để trích xuất địa chỉ MAC vật lý. Tự động đối chiếu tiền tố 24-bit OUI với cơ sở dữ liệu để nhận diện nhà sản xuất (Apple, Intel, TP-Link, Arcadyan...) và phát hiện cơ chế địa chỉ MAC ngẫu nhiên (Private/Randomized MAC).
+* **Quét cổng TCP hiệu năng cao (L4):** Sử dụng TCP 3-Way Handshake kết hợp `ThreadPoolExecutor` để quét đồng thời danh sách cổng dịch vụ thông dụng (1–1000), rút ngắn thời gian thực thi xuống dưới 1 phút.
+* **Thu thập Banner chủ động (L7):** Thực hiện kết nối socket chủ động để trích xuất chuỗi định danh dịch vụ và phiên bản web server thực tế (`Server: Apache/Nginx/mini_httpd...`).
+
+### 2. Giám Sát Biến Động Mạng (Network Diffing Engine)
+* Áp dụng lý thuyết tập hợp (Set Operations) để so sánh trạng thái giữa 2 phiên quét kế tiếp:
+  * **Thiết bị mới:** Nhận diện các máy mới gia nhập mạng (`new_hosts`).
+  * **Thiết bị rời mạng:** Phát hiện các thiết bị ngắt kết nối (`offline_hosts`).
+  * **Thay đổi cổng:** Cảnh báo cổng dịch vụ mới mở hoặc vừa bị đóng trên từng thiết bị (`port_changes`).
+
+### 3. Đánh Giá Rủi Ro & Chấm Điểm An Ninh (Security Scoring Engine)
+* Chấm điểm an toàn mạng trên thang điểm **100** dựa trên chuẩn đánh giá an ninh (NIST/CIS).
+* Phân loại rủi ro theo 4 cấp độ nghiêm trọng: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
+* Cảnh báo các cổng nguy hiểm: Telnet (23), SMB (445), RPC (135), NetBIOS (139), FTP (21), RDP (3389), MySQL (3306)...
+* Phân hạng an toàn (`A`, `B`, `C`, `F`) và cung cấp khuyến nghị khắc phục chi tiết (Remediation) cho từng điểm yếu phát hiện được.
+
+### 4. Giao Diện Giám Sát Thời Gian Thực (Dashboard UI)
+* Thiết kế Dark Slate hiện đại, xây dựng bằng HTML5/CSS3 và Vanilla JavaScript (không phụ thuộc framework nặng).
+* Cơ chế Polling theo dõi trạng thái và tiến độ quét (0% $\rightarrow$ 100%) mà không gây nghẽn kết nối.
+* Xử lý triệt để lỗi bất đồng bộ **Race Condition** khi chuyển đổi phiên quét bằng kỹ thuật Request Sequence Tracking.
+
+---
+
+## 🛠️ Công Nghệ Sử Dụng
 
 * **Ngôn ngữ:** Python 3.12+
 * **Backend:** FastAPI, Uvicorn, Pydantic
 * **Network & Concurrency:** `socket`, `subprocess`, `concurrent.futures`, `ipaddress`
-* **Cơ sở dữ liệu:** SQLite3 (`sqlite3` native module)
-* **Frontend:** HTML5, CSS3 (Modern Dark Slate), Vanilla JavaScript (Async/Await Fetch API)
+* **Cơ sở dữ liệu:** SQLite3 (Lưu trữ quan hệ phân cấp: `Scan -> Host -> Port`)
+* **Frontend:** HTML5, CSS3, Vanilla JavaScript (Fetch API / Async-Await)
+* **Testing:** `pytest`, unit testing chuẩn cho engine chấm điểm
 
 ---
 
-## 📁 Cấu trúc dự án
+## 📁 Cấu Trúc Dự Án
 
-```
+```text
 NetScope/
 ├── backend/
 │   ├── __init__.py
-│   └── main.py                 # REST API endpoints & background task pipeline
+│   └── main.py                 # FastAPI Web Server, Background Tasks & REST API
 ├── database/
 │   ├── __init__.py
-│   ├── db.py                   # Kết nối SQLite và các hàm CRUD
+│   ├── db.py                   # Kết nối SQLite, auto-migrations và CRUD helpers
 │   └── data/
 │       └── netscope.db         # File cơ sở dữ liệu SQLite (git ignored)
 ├── scanner/
 │   ├── __init__.py
-│   ├── host_discovery.py       # Logic Ping Sweep & kiểm tra cờ TTL
+│   ├── host_discovery.py       # Ping Sweep đa luồng & phân tích TTL
 │   ├── port_scanner.py         # Quét TCP Socket đa luồng & map dịch vụ
-│   └── monitor.py              # Thuật toán Diff so sánh 2 phiên quét
+│   ├── mac_resolver.py         # Parse bảng ARP & tra cứu nhà sản xuất qua OUI
+│   ├── banner_grabber.py       # Bóc tách L7 banner dịch vụ qua socket probe
+│   ├── security_scorer.py      # Rule-based Engine chấm điểm an ninh & đề xuất khắc phục
+│   └── monitor.py              # Thuật toán Diff so sánh trạng thái giữa 2 phiên quét
 ├── frontend/
-│   ├── index.html              # Web Dashboard layout
-│   ├── style.css               # Giao diện Dark Slate
-│   └── app.js                  # Logic gọi API và Polling tiến độ quét
+│   ├── index.html              # Layout Dashboard
+│   ├── style.css               # Định dạng giao diện Dark Slate & Severity Badges
+│   └── app.js                  # Logic gọi API, Polling tiến độ & chống Race Condition
 ├── tests/
 │   ├── __init__.py
-│   └── test_modules.py         # Bộ kiểm thử tích hợp (Integration Tests)
-├── pre-project/                # Kịch bản thử nghiệm giai đoạn PoC
-├── .gitignore
-├── requirements.txt
+│   ├── test_modules.py         # Kiểm thử tích hợp core scanner
+│   └── test_security_scorer.py # Unit test thuật toán đánh giá rủi ro
+├── requirements.txt            # Danh sách thư viện phụ thuộc
 └── README.md
 ```
 
 ---
 
-## 🚀 Hướng dẫn cài đặt & Chạy ứng dụng
+## 🚀 Hướng Dẫn Cài Đặt & Chạy Ứng Dụng
 
-**1. Khởi tạo môi trường ảo (Virtual Environment):**
+### 1. Khởi tạo môi trường ảo (Virtual Environment)
 
-``` bash
+```bash
 # Tạo môi trường ảo
 python -m venv venv
 
@@ -72,19 +97,19 @@ python -m venv venv
 source venv/bin/activate
 ```
 
-**2. Cài đặt các thư viện phụ thuộc:**
+### 2. Cài đặt các thư viện phụ thuộc
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**3. Khởi chạy Server FastAPI:**
+### 3. Khởi chạy Server Backend
 
 ```bash
 uvicorn backend.main:app --reload
 ```
 
-**4. Truy cập hệ thống:**
+### 4. Truy cập hệ thống
 
 * **Web Dashboard:** [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
 * **Tài liệu API tương tác (Swagger UI):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
@@ -95,24 +120,25 @@ uvicorn backend.main:app --reload
 
 | Phương thức | Endpoint | Mô tả |
 | :--- | :--- | :--- |
-| `POST` | `/api/scan` | Khởi động phiên quét mạng mới ở chế độ background |
-| `GET` | `/api/scan/status` | Kiểm tra tiến độ (%) và bước thực thi hiện tại |
-| `GET` | `/api/scans` | Lấy danh sách tóm tắt toàn bộ lịch sử các phiên quét |
-| `GET` | `/api/scans/{scan_id}` | Lấy chi tiết toàn bộ máy và cổng mở của một phiên quét |
+| `POST` | `/api/scan` | Khởi động phiên quét mạng mới ở chế độ background task |
+| `GET` | `/api/scan/status` | Kiểm tra tiến độ (%) và thông tin bước quét hiện tại |
+| `GET` | `/api/scans` | Lấy danh sách lịch sử tất cả các phiên quét đã lưu |
+| `GET` | `/api/scans/{scan_id}` | Lấy chi tiết thông tin một phiên quét (Hosts, Ports, MAC, Banner) |
+| `GET` | `/api/scans/{scan_id}/security` | Xuất báo cáo đánh giá rủi ro an ninh mạng và danh mục khuyến nghị |
 | `GET` | `/api/diff` | So sánh và phân tích biến động giữa 2 phiên quét gần nhất |
 
 ---
 
-## 🧪 Kiểm thử tích hợp (Integration Tests)
+## 🧪 Kiểm Thử (Testing)
 
-Chạy kịch bản kiểm tra toàn vẹn giữa các module:
+Dự án tích hợp sẵn các bộ kiểm thử độc lập cho core engine:
 
 ```bash
+# Chạy kiểm thử tích hợp các module scanner
 python tests/test_modules.py
+
+# Chạy kiểm thử đơn vị cho Security Scorer
+python tests/test_security_scorer.py
 ```
 
-Bộ test tự động xác thực:
-1. Tính tương thích khi import các package nội bộ.
-2. Thao tác CRUD và tính toàn vẹn khóa ngoại trên Database SQLite.
-3. Thuật toán Set Difference của module `diff_scans`.
-4. Khả năng kết nối Socket TCP và ICMP Ping trên `127.0.0.1`.
+---
