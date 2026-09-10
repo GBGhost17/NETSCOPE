@@ -45,10 +45,23 @@ def init_db():
                 FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE
             )
         ''')
+
+        cursor.execute("PRAGMA table_info(hosts)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "mac" not in columns:
+            cursor.execute("ALTER TABLE hosts ADD COLUMN mac TEXT DEFAULT 'Unknown'")
+        if "vendor" not in columns:
+            cursor.execute("ALTER TABLE hosts ADD COLUMN vendor TEXT DEFAULT 'Unknown Device'")
+
+        cursor.execute("PRAGMA table_info(ports)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "banner" not in columns:
+            cursor.execute("ALTER TABLE ports ADD COLUMN banner TEXT DEFAULT ''")
+
         conn.commit()
 
 def save_scan(scan_report: dict) -> int:
-    """Lưu toàn bộ kết quả phiên quét và trả về scan_id."""
+    """Lưu toàn bộ kết quả phiên quét (đảm bảo mỗi port chỉ insert đúng 1 lần)."""
     with get_connection() as conn:
         cursor = conn.cursor()
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -59,18 +72,24 @@ def save_scan(scan_report: dict) -> int:
         )
         scan_id = cursor.lastrowid
         
-        for ip, ports_info in scan_report["hosts"].items():
+        for ip, host_info in scan_report["hosts"].items():
+            mac = host_info.get("mac", "Unknown")
+            vendor = host_info.get("vendor", "Unknown Device")
+            
             cursor.execute(
-                "INSERT INTO hosts (scan_id, ip) VALUES (?, ?)",
-                (scan_id, ip)
+                "INSERT INTO hosts (scan_id, ip, mac, vendor) VALUES (?, ?, ?, ?)",
+                (scan_id, ip, mac, vendor)
             )
             host_id = cursor.lastrowid
             
-            for p in ports_info:
+            # CHỈ DÙNG 1 LỆNH INSERT DUY NHẤT CHO MỖI PORT
+            for p in host_info.get("ports", []):
+                banner = p.get("banner", "")
                 cursor.execute(
-                    "INSERT INTO ports (host_id, port, service) VALUES (?, ?, ?)",
-                    (host_id, p["port"], p["service"])
+                    "INSERT INTO ports (host_id, port, service, banner) VALUES (?, ?, ?, ?)",
+                    (host_id, p["port"], p["service"], banner)
                 )
+                
         conn.commit()
         return scan_id
 
@@ -91,15 +110,20 @@ def get_scan_by_id(scan_id: int):
             "hosts": {}
         }
         
-        cursor.execute("SELECT id, ip FROM hosts WHERE scan_id = ?", (scan_id,))
+        cursor.execute("SELECT id, ip, mac, vendor FROM hosts WHERE scan_id = ?", (scan_id,))
         hosts = cursor.fetchall()
         
         for host in hosts:
             h_id = host["id"]
             ip = host["ip"]
-            cursor.execute("SELECT port, service FROM ports WHERE host_id = ?", (h_id,))
+            cursor.execute("SELECT port, service, banner FROM ports WHERE host_id = ?", (h_id,))
             ports = cursor.fetchall()
-            result["hosts"][ip] = [{"port": p["port"], "service": p["service"]} for p in ports]
+
+            result["hosts"][ip] = {
+                "mac": host["mac"],
+                "vendor": host["vendor"],
+                "ports": [{"port": p["port"], "service": p["service"], "banner": p["banner"] or ""} for p in ports]
+            }
             
         return result
 
