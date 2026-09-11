@@ -1,0 +1,13 @@
+services:
+  netscope:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: netscope-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./database/data:/app/database/data
+    environment:
+      - PYTHONUNBUFFERED=1
