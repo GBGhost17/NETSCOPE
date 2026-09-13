@@ -23,7 +23,7 @@
             <div class="input-group">
                 <label for="target-input">Dải mạng mục tiêu (CIDR):</label>
                 <div class="form-row">
-                    <input type="text" id="target-input" value="192.168.1.1/24" placeholder="VD: 192.168.1.1/24">
+                    <input type="text" id="target-input" value="192.168.2.1/24" placeholder="VD: 192.168.2.1/24">
                     <button id="scan-btn" onclick="startScan()">Khởi động Quét</button>
                 </div>
             </div>
@@ -36,6 +36,30 @@
                 </div>
                 <div class="progress-bar-bg">
                     <div id="progress-bar-fill"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Scheduler Control Card -->
+        <section class="card scheduler-card">
+            <div class="scheduler-header">
+                <div>
+                    <h3>⏰ Lập Lịch Quét Tự Động</h3>
+                    <p class="scheduler-desc">Tự động kích hoạt chu kỳ quét mạng ngầm định kỳ</p>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="scheduler-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="scheduler-body">
+                <div class="scheduler-input-group">
+                    <label for="scheduler-interval">Chu kỳ thực thi (phút):</label>
+                    <input type="number" id="scheduler-interval" min="1" max="1440" value="30">
+                </div>
+                <div class="scheduler-status-info">
+                    <span>Trạng thái: <strong id="scheduler-status-label">Đang tắt</strong></span>
+                    <span id="scheduler-next-run" class="hidden"> | Lần quét tiếp theo: <strong id="scheduler-next-time">--</strong></span>
                 </div>
             </div>
         </section>
