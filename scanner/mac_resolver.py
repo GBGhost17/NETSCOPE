@@ -32,7 +32,9 @@ OUI_DATABASE = {
     "00:1A:2B": "Intel Corporate", "18:65:90": "Intel Corporate",
     "B8:85:84": "Dell Inc.", "00:14:22": "Dell Inc.",
     "D8:47:32": "HP Inc.", "00:50:56": "VMware Virtual Adapter",
-    "08:00:27": "Oracle VirtualBox", "00:15:5D": "Microsoft Hyper-V"
+    "08:00:27": "Oracle VirtualBox", "00:15:5D": "Microsoft Hyper-V",
+
+    "FC:40:09": "ZTE Corporation"
 }
 
 def get_system_arp_table() -> dict[str, str]:
@@ -79,9 +81,27 @@ def get_system_arp_table() -> dict[str, str]:
     return arp_table
 
 def resolve_vendor(mac: str) -> str:
-    """Tra cứu hãng sản xuất từ 3 byte đầu tiên (OUI prefix) của địa chỉ MAC."""
+    """Tra cứu Vendor từ OUI hoặc phát hiện địa chỉ MAC ngẫu nhiên (Private MAC)."""
     if not mac or mac == "Unknown":
+        return "This Machine / Gateway"
+
+    # Chuẩn hóa chuỗi MAC về dạng chữ hoa và loại bỏ ký tự phân tách
+    clean_mac = mac.replace(":", "").replace("-", "").upper()
+    if len(clean_mac) < 6:
         return "Unknown Device"
-    
-    prefix = ":".join(mac.split(":")[:3]).upper()
-    return OUI_DATABASE.get(prefix, "Generic / Unregistered Vendor")
+
+    # 1. Tra cứu theo bảng OUI tiền tố (24-bit OUI)
+    oui = ":".join([clean_mac[i:i+2] for i in range(0, 6, 2)])
+    if oui in OUI_DATABASE:
+        return OUI_DATABASE[oui]
+
+    # 2. Kiểm tra bit U/L (Locally Administered Bit) ở octet đầu tiên
+    try:
+        first_byte = int(clean_mac[:2], 16)
+        if first_byte & 0b10:  # Bit thứ 2 từ phải sang là 1
+            return "Randomized / Private MAC (Mobile Device)"
+    except ValueError:
+        pass
+
+    # 3. Mặc định nếu không trùng OUI và không phải MAC ngẫu nhiên
+    return "Generic / Unregistered Vendor"
