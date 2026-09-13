@@ -4,10 +4,10 @@
 [![Framework](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg)](https://www.docker.com/)
 [![Database](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://www.sqlite.org/)
-[![Release](https://img.shields.io/badge/release-v1.1.0-emerald.svg)](https://github.com/)
+[![Release](https://img.shields.io/badge/release-v1.3.0-emerald.svg)](https://github.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**NetScope** là hệ thống trinh sát mạng cục bộ (LAN Reconnaissance), giám sát biến động thiết bị (Network Drift Detection) và đánh giá rủi ro an ninh mạng tự động. Ứng dụng kết hợp kiến trúc I/O bất đồng bộ hiệu năng cao (FastAPI, multi-threading) cùng Web Dashboard trực quan, hỗ trợ phân tích dữ liệu đa tầng từ Data Link (L2) đến Application (L7).
+**NetScope** là hệ thống trinh sát mạng cục bộ (LAN Reconnaissance), giám sát biến động thiết bị (Network Drift Detection), lập lịch quét tự động (Background Task Scheduler) và đánh giá rủi ro an ninh mạng toàn diện. Ứng dụng kết hợp kiến trúc I/O bất đồng bộ hiệu năng cao (FastAPI, Asyncio Worker, Multi-threading) cùng Web Dashboard trực quan, hỗ trợ phân tích dữ liệu đa tầng từ Data Link (L2) đến Application (L7).
 
 ---
 
@@ -15,24 +15,30 @@
 
 ### 1. Trinh Sát Mạng Đa Tầng (L2 - L7 Inspection)
 * **Khám phá Host chuẩn xác (L3):** Quét toàn bộ dải mạng CIDR qua ICMP Ping đa luồng. Bóc tách thông số `TTL` từ phản hồi để loại bỏ triệt để hiện tượng nhận diện sai (False Positive) do ARP Cache trên Windows.
-* **Định danh MAC & Nhà sản xuất (L2):** Phân tích bảng ARP Cache hệ thống (`arp -a` hoặc `/proc/net/arp`) để trích xuất địa chỉ MAC vật lý. Tự động đối chiếu tiền tố 24-bit OUI với cơ sở dữ liệu để nhận diện nhà sản xuất (Apple, Intel, TP-Link, Arcadyan...) và phát hiện cơ chế địa chỉ MAC ngẫu nhiên (Private/Randomized MAC).
+* **Định danh MAC & Nhận diện Private MAC (L2):** Phân tích bảng ARP Cache hệ thống (`arp -a` hoặc `/proc/net/arp`) để trích xuất địa chỉ MAC vật lý. Tự động đối chiếu tiền tố 24-bit OUI (Apple, Intel, TP-Link, ZTE...) và giải mã bit U/L (Locally Administered Bit) ở octet đầu tiên để nhận diện địa chỉ MAC ngẫu nhiên/riêng tư (Private/Randomized MAC) trên thiết bị di động (iOS, Android).
 * **Quét cổng TCP hiệu năng cao (L4):** Sử dụng TCP 3-Way Handshake kết hợp `ThreadPoolExecutor` để quét đồng thời danh sách cổng dịch vụ thông dụng (1–1000), rút ngắn thời gian thực thi xuống dưới 1 phút.
-* **Thu thập Banner chủ động (L7):** Thực hiện kết nối socket chủ động để trích xuất chuỗi định danh dịch vụ và phiên bản web server thực tế (`Server: Apache/Nginx/mini_httpd...`).
+* **Thu thập Banner chủ động (L7):** Thực hiện kết nối socket chủ động để trích xuất chuỗi định danh dịch vụ và phiên bản web server thực tế (`Server: Apache/Nginx/mini_httpd/ZTE web server...`).
 
-### 2. Giám Sát Biến Động Mạng (Network Diffing Engine)
+### 2. Lập Lịch Quét Ngầm Định Kỳ (Background Task Scheduler)
+* Tích hợp Async Worker vận hành trực tiếp trên Event Loop chính của FastAPI, giải phóng hoàn toàn thao tác thủ công.
+* Hỗ trợ cấu hình chu kỳ quét linh hoạt theo phút, tự động tính toán mốc thời gian thực thi tiếp theo (`next_run`).
+* Cơ chế bảo vệ xung đột: Tự động khóa luồng khi có phiên quét đang chạy, ngăn ngừa hiện tượng nghẽn I/O và xung đột socket mạng.
+
+### 3. Giám Sát Biến Động Mạng (Network Diffing Engine)
 * Áp dụng lý thuyết tập hợp (Set Operations) để so sánh trạng thái giữa 2 phiên quét kế tiếp:
   * **Thiết bị mới:** Nhận diện các máy mới gia nhập mạng (`new_hosts`).
   * **Thiết bị rời mạng:** Phát hiện các thiết bị ngắt kết nối (`offline_hosts`).
   * **Thay đổi cổng:** Cảnh báo cổng dịch vụ mới mở hoặc vừa bị đóng trên từng thiết bị (`port_changes`).
 
-### 3. Đánh Giá Rủi Ro & Chấm Điểm An Ninh (Security Scoring Engine)
+### 4. Đánh Giá Rủi Ro & Chấm Điểm An Ninh (Security Scoring Engine)
 * Chấm điểm an toàn mạng trên thang điểm **100** dựa trên chuẩn đánh giá an ninh (NIST/CIS).
 * Phân loại rủi ro theo 4 cấp độ nghiêm trọng: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
 * Cảnh báo các cổng nguy hiểm: Telnet (23), SMB (445), RPC (135), NetBIOS (139), FTP (21), RDP (3389), MySQL (3306)...
 * Phân hạng an toàn (`A`, `B`, `C`, `F`) và cung cấp khuyến nghị khắc phục chi tiết (Remediation) cho từng điểm yếu phát hiện được.
 
-### 4. Giao Diện Giám Sát Thời Gian Thực (Dashboard UI)
+### 5. Giao Diện Giám Sát Thời Gian Thực (Dashboard UI)
 * Thiết kế Dark Slate hiện đại, xây dựng bằng HTML5/CSS3 và Vanilla JavaScript (không phụ thuộc framework nặng).
+* Bảng điều khiển Scheduler trực quan với Toggle Switch bật/tắt và ô tùy biến chu kỳ thời gian thực.
 * Cơ chế Polling theo dõi trạng thái và tiến độ quét (0% $\rightarrow$ 100%) mà không gây nghẽn kết nối.
 * Xử lý triệt để lỗi bất đồng bộ **Race Condition** khi chuyển đổi phiên quét bằng kỹ thuật Request Sequence Tracking.
 
@@ -41,7 +47,7 @@
 ## 🛠️ Công Nghệ Sử Dụng
 
 * **Ngôn ngữ:** Python 3.12+
-* **Backend:** FastAPI, Uvicorn, Pydantic
+* **Backend:** FastAPI, Uvicorn, Pydantic, Asyncio
 * **DevOps & Containerization:** Docker, Docker Compose (Multi-stage build, Volume Data Persistence)
 * **Network & Concurrency:** `socket`, `subprocess`, `concurrent.futures`, `ipaddress`
 * **Cơ sở dữ liệu:** SQLite3 (Lưu trữ quan hệ phân cấp: `Scan -> Host -> Port`)
@@ -56,6 +62,7 @@
 NetScope/
 ├── backend/
 │   ├── __init__.py
+│   ├── scheduler.py            # Async Background Worker điều phối chu kỳ quét ngầm
 │   └── main.py                 # FastAPI Web Server, Background Tasks & REST API
 ├── database/
 │   ├── __init__.py
@@ -66,14 +73,14 @@ NetScope/
 │   ├── __init__.py
 │   ├── host_discovery.py       # Ping Sweep đa luồng & phân tích TTL
 │   ├── port_scanner.py         # Quét TCP Socket đa luồng & map dịch vụ
-│   ├── mac_resolver.py         # Parse bảng ARP & tra cứu nhà sản xuất qua OUI
+│   ├── mac_resolver.py         # Parse ARP, tra cứu OUI & phát hiện Private MAC
 │   ├── banner_grabber.py       # Bóc tách L7 banner dịch vụ qua socket probe
 │   ├── security_scorer.py      # Rule-based Engine chấm điểm an ninh & đề xuất khắc phục
 │   └── monitor.py              # Thuật toán Diff so sánh trạng thái giữa 2 phiên quét
 ├── frontend/
-│   ├── index.html              # Layout Dashboard
-│   ├── style.css               # Định dạng giao diện Dark Slate & Severity Badges
-│   └── app.js                  # Logic gọi API, Polling tiến độ & chống Race Condition
+│   ├── index.html              # Layout Dashboard & Scheduler Control Panel
+│   ├── style.css               # Định dạng giao diện Dark Slate, Badges & Custom Switch
+│   └── app.js                  # Logic gọi API, Polling tiến độ & quản lý Scheduler
 ├── tests/
 │   ├── __init__.py
 │   ├── test_modules.py         # Kiểm thử tích hợp core scanner
@@ -152,12 +159,15 @@ Hệ thống đã được container hóa trọn gói, tích hợp sẵn các g�
 
 | Phương thức | Endpoint | Mô tả |
 | :--- | :--- | :--- |
-| `POST` | `/api/scan` | Khởi động phiên quét mạng mới ở chế độ background task |
+| `POST` | `/api/scan` | Khởi động phiên quét mạng thủ công ở chế độ background task |
 | `GET` | `/api/scan/status` | Kiểm tra tiến độ (%) và thông tin bước quét hiện tại |
 | `GET` | `/api/scans` | Lấy danh sách lịch sử tất cả các phiên quét đã lưu |
 | `GET` | `/api/scans/{scan_id}` | Lấy chi tiết thông tin một phiên quét (Hosts, Ports, MAC, Banner) |
 | `GET` | `/api/scans/{scan_id}/security` | Xuất báo cáo đánh giá rủi ro an ninh mạng và danh mục khuyến nghị |
 | `GET` | `/api/diff` | So sánh và phân tích biến động giữa 2 phiên quét gần nhất |
+| `GET` | `/api/scheduler` | Lấy trạng thái hoạt động và lịch quét ngầm tiếp theo |
+| `POST` | `/api/scheduler/start` | Kích hoạt lập lịch quét tự động định kỳ theo chu kỳ (phút) |
+| `POST` | `/api/scheduler/stop` | Dừng tiến trình lập lịch quét tự động |
 
 ---
 
