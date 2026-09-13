@@ -1,13 +1,17 @@
-
 const API_BASE = "http://127.0.0.1:8000/api";
 let pollingTimer = null;
+let schedulerPollTimer = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadHistory();
     loadDiff();
+    initScheduler();
+    checkInitialScanStatus();
 });
 
-// 1. Kích hoạt phiên quét mới
+// ================= 1. QUẢN LÝ QUÉT THỦ CÔNG & TIẾN ĐỘ =================
+
+// Kích hoạt phiên quét mới thủ công
 async function startScan() {
     const target = document.getElementById("target-input").value.trim();
     if (!target) return alert("Vui lòng nhập dải mạng!");
@@ -29,7 +33,7 @@ async function startScan() {
             return;
         }
 
-        // Bật thanh tiến độ và bắt đầu Polling
+        // Hiển thị thanh tiến độ và bắt đầu Polling
         document.getElementById("progress-container").classList.remove("hidden");
         startPolling();
     } catch (e) {
@@ -38,29 +42,33 @@ async function startScan() {
     }
 }
 
-// 2. Kiểm tra trạng thái tiến trình quét (Polling mỗi 1.5s)
+// Kiểm tra trạng thái tiến trình quét (Polling mỗi 1.5s)
 function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+
     pollingTimer = setInterval(async () => {
         try {
             const res = await fetch(`${API_BASE}/scan/status`);
             const data = await res.json();
 
-            // Cập nhật UI thanh tiến độ
+            // Cập nhật giao diện thanh tiến độ
             document.getElementById("progress-step").innerText = data.step;
             document.getElementById("progress-percent").innerText = `${data.progress}%`;
             document.getElementById("progress-bar-fill").style.width = `${data.progress}%`;
 
-            // Khi hoàn thành
+            // Khi phiên quét hoàn tất
             if (!data.is_running && data.progress === 100) {
                 clearInterval(pollingTimer);
+                pollingTimer = null;
                 document.getElementById("scan-btn").disabled = false;
 
-                // Tải chi tiết phiên vừa quét xong
+                // Tải dữ liệu mới nhất
                 if (data.last_scan_id) {
                     loadScanDetail(data.last_scan_id);
                 }
                 loadHistory();
                 loadDiff();
+                fetchSchedulerStatus(); // Đồng bộ lại thời gian lần quét kế tiếp
             }
         } catch (e) {
             console.error("Lỗi Polling trạng thái:", e);
@@ -68,7 +76,116 @@ function startPolling() {
     }, 1500);
 }
 
-// 3. Hiển thị chi tiết 1 phiên quét lên giao diện
+// Tự động bắt tiến trình quét nếu đã có phiên chạy ngầm từ trước (do Scheduler kích hoạt)
+async function checkInitialScanStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/scan/status`);
+        const data = await res.json();
+        if (data.is_running && !pollingTimer) {
+            document.getElementById("progress-container").classList.remove("hidden");
+            document.getElementById("scan-btn").disabled = true;
+            startPolling();
+        }
+    } catch (e) {
+        console.error("Lỗi kiểm tra trạng thái quét ban đầu:", e);
+    }
+}
+
+// ================= 2. QUẢN LÝ LẬP LỊCH QUÉT TỰ ĐỘNG (SCHEDULER) =================
+
+function initScheduler() {
+    const toggle = document.getElementById("scheduler-toggle");
+    const intervalInput = document.getElementById("scheduler-interval");
+
+    if (!toggle || !intervalInput) return;
+
+    // Lấy cấu hình hiện tại từ máy chủ
+    fetchSchedulerStatus();
+
+    // Lắng nghe sự kiện bật/tắt Toggle
+    toggle.addEventListener("change", async (e) => {
+        const isChecked = e.target.checked;
+        const targetNet = document.getElementById("target-input")?.value.trim() || "192.168.1.1/24";
+        const interval = parseInt(intervalInput.value, 10) || 30;
+
+        if (isChecked) {
+            try {
+                const res = await fetch(`${API_BASE}/scheduler/start`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ target: targetNet, interval_minutes: interval })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.detail || "Không thể kích hoạt lập lịch!");
+                    e.target.checked = false;
+                    return;
+                }
+            } catch (err) {
+                alert("Lỗi kết nối khi bật scheduler!");
+                e.target.checked = false;
+                return;
+            }
+        } else {
+            try {
+                await fetch(`${API_BASE}/scheduler/stop`, { method: "POST" });
+            } catch (err) {
+                console.error("Lỗi khi dừng scheduler:", err);
+            }
+        }
+
+        fetchSchedulerStatus();
+    });
+
+    // Cập nhật trạng thái scheduler định kỳ mỗi 15 giây
+    if (!schedulerPollTimer) {
+        schedulerPollTimer = setInterval(fetchSchedulerStatus, 15000);
+    }
+}
+
+async function fetchSchedulerStatus() {
+    const toggle = document.getElementById("scheduler-toggle");
+    const intervalInput = document.getElementById("scheduler-interval");
+    const statusLabel = document.getElementById("scheduler-status-label");
+    const nextRunBox = document.getElementById("scheduler-next-run");
+    const nextTimeLabel = document.getElementById("scheduler-next-time");
+
+    if (!toggle || !statusLabel) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/scheduler`);
+        const data = await res.json();
+
+        toggle.checked = data.is_running;
+        intervalInput.value = data.interval_minutes;
+        intervalInput.disabled = data.is_running;
+
+        if (data.is_running) {
+            statusLabel.textContent = "Đang bật";
+            statusLabel.style.color = "#10b981";
+
+            if (data.next_run) {
+                nextRunBox.classList.remove("hidden");
+                nextTimeLabel.textContent = data.next_run;
+            } else {
+                nextRunBox.classList.add("hidden");
+            }
+
+            // Nếu scheduler đang chạy phiên quét mà giao diện chưa polling thì kích hoạt ngay
+            checkInitialScanStatus();
+        } else {
+            statusLabel.textContent = "Đang tắt";
+            statusLabel.style.color = "var(--text-secondary, #94a3b8)";
+            nextRunBox.classList.add("hidden");
+        }
+    } catch (e) {
+        console.error("Lỗi đồng bộ trạng thái Scheduler:", e);
+    }
+}
+
+// ================= 3. HIỂN THỊ DỮ LIỆU PHIÊN QUÉT & HOST =================
+
 async function loadScanDetail(scanId) {
     try {
         const res = await fetch(`${API_BASE}/scans/${scanId}`);
@@ -111,25 +228,25 @@ async function loadScanDetail(scanId) {
             }
 
             card.innerHTML = `
-            <div class="host-ip">🖥️ ${ip}</div>
-            <div class="host-meta">
-                <div><strong>MAC:</strong> <code>${mac}</code></div>
-                <div><span class="vendor-badge">${vendor}</span></div>
-            </div>
-            <div style="margin-top: 10px;">${portsHtml}</div>
-        `;
+                <div class="host-ip">🖥️ ${ip}</div>
+                <div class="host-meta">
+                    <div><strong>MAC:</strong> <code>${mac}</code></div>
+                    <div><span class="vendor-badge">${vendor}</span></div>
+                </div>
+                <div style="margin-top: 10px;">${portsHtml}</div>
+            `;
             grid.appendChild(card);
         });
 
-        // Gọi nạp dữ liệu đánh giá an ninh mạng cho phiên này
+        // Nạp báo cáo an ninh cho phiên này
         loadSecurityAudit(scanId);
-        
+
     } catch (e) {
         console.error("Lỗi lấy chi tiết scan:", e);
     }
 }
 
-// 4. Tải danh sách lịch sử các phiên quét
+// Tải lịch sử các phiên quét
 async function loadHistory() {
     try {
         const res = await fetch(`${API_BASE}/scans`);
@@ -151,7 +268,7 @@ async function loadHistory() {
             tbody.appendChild(tr);
         });
 
-        // Tự động nạp bản ghi mới nhất lên màn hình
+        // Nạp phiên quét mới nhất nếu có
         if (scans.length > 0) {
             loadScanDetail(scans[0].id);
         }
@@ -160,7 +277,8 @@ async function loadHistory() {
     }
 }
 
-// 5. Tải dữ liệu Diffing/Monitoring
+// ================= 4. GIÁM SÁT BIẾN ĐỘNG (DIFFING) & ĐÁNH GIÁ AN NINH =================
+
 async function loadDiff() {
     try {
         const res = await fetch(`${API_BASE}/diff`);
@@ -195,7 +313,6 @@ async function loadDiff() {
     }
 }
 
-// 6. Tải và hiển thị báo cáo đánh giá rủi ro an ninh mạng
 let securityAuditRequestSeq = 0;
 
 async function loadSecurityAudit(scanId) {
@@ -245,4 +362,3 @@ async function loadSecurityAudit(scanId) {
         card.classList.add("hidden");
     }
 }
-
